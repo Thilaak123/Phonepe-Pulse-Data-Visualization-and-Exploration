@@ -34,32 +34,34 @@ if mydb:
     # Modify SQL query to include the selected year and quarter from multiple tables
     query = """
         SELECT state, 
-               SUM(transaction_count) AS transaction_count, 
+               SUM(transaction_count) AS transaction_count,
+               SUM(Transaction_type) AS Transaction_type,
+               SUM(Transaction_amount) AS Transaction_amount,
                SUM(appOpens) AS appOpens, 
                SUM(registeredUsers) AS registeredUsers,
                SUM(count) AS count
         FROM (
-            SELECT state, transaction_count, 0 AS appOpens, 0 AS registeredUsers, 0 AS count 
+            SELECT state, transaction_count, Transaction_type, Transaction_amount, 0 AS appOpens, 0 AS registeredUsers, 0 AS count 
             FROM agg_trans 
             WHERE year = %s AND quater = %s
             UNION ALL
-            SELECT state, 0 AS transaction_count, 0 AS appOpens, 0 AS registeredUsers, count
+            SELECT state, 0 AS transaction_count, 0 Transaction_type, 0 Transaction_amount, 0 AS appOpens, 0 AS registeredUsers, count
             FROM agg_user 
             WHERE year = %s AND quater = %s
             UNION ALL
-            SELECT state, 0 AS transaction_count, 0 AS appOpens, 0 AS registeredUsers, count
+            SELECT state, 0 AS transaction_count, 0 Transaction_type, 0 Transaction_amount, 0 AS appOpens, 0 AS registeredUsers, count
             FROM map_trans 
             WHERE year = %s AND quater = %s
             UNION ALL
-            SELECT state, 0 AS transaction_count, appOpens, 0 AS registeredUsers, 0 AS count
+            SELECT state, 0 AS transaction_count, 0 Transaction_type, 0 Transaction_amount, appOpens, 0 AS registeredUsers, 0 AS count
             FROM map_user 
             WHERE year = %s AND quater = %s
             UNION ALL
-            SELECT state, 0 AS transaction_count, 0 AS appOpens, 0 AS registeredUsers, count
+            SELECT state, 0 AS transaction_count, 0 Transaction_type, 0 Transaction_amount, 0 AS appOpens, 0 AS registeredUsers, count
             FROM top_trans 
             WHERE year = %s AND quater = %s
             UNION ALL
-            SELECT state, 0 AS transaction_count, 0 AS appOpens, registeredUsers, 0 AS count
+            SELECT state, 0 AS transaction_count, 0 Transaction_type, 0 Transaction_amount, 0 AS appOpens, registeredUsers, 0 AS count
             FROM top_user 
             WHERE year = %s AND quater = %s
         ) AS combined_data
@@ -85,7 +87,7 @@ if mydb:
 
     if not df.empty:
         # Select which metric to visualize
-        metric = st.selectbox('Select Metric to Visualize', ['transaction_count', 'appOpens', 'registeredUsers', 'count'])
+        metric = st.selectbox('Select Metric to Visualize', ['transaction_count', 'Transaction_type', 'Transaction_amount', 'appOpens', 'registeredUsers', 'count'])
 
         # Create a choropleth map using Plotly
         fig = px.choropleth(
@@ -102,3 +104,6 @@ if mydb:
         st.plotly_chart(fig)  # Display the Plotly chart
     else:
         st.error("No data found to display.")
+
+
+   
