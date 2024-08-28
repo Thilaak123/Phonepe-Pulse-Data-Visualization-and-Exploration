@@ -1,0 +1,104 @@
+import mysql.connector
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+
+# Function to create a database connection
+def create_db_connection():
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",  # Your MySQL server host
+            user="root",  # Your MySQL username
+            password="Tikki@123",  # Your MySQL password
+            database="project2"  # Your database name
+        )
+        if connection.is_connected():
+            print("Connection Established")
+            return connection
+    except mysql.connector.Error as err:
+        st.error(f"Error: {err}")
+        return None
+
+# Create connection to the database
+mydb = create_db_connection()
+
+if mydb:
+    cursor = mydb.cursor()
+
+    # Year selection dropdown
+    year = st.selectbox('Select Year', [2018, 2019, 2020, 2021, 2022, 2023])
+
+    # Quarter selection dropdown
+    quater = st.selectbox('Select Quarter', [1, 2, 3, 4])
+
+    # Modify SQL query to include the selected year and quarter from multiple tables
+    query = """
+        SELECT state, 
+               SUM(transaction_count) AS transaction_count, 
+               SUM(appOpens) AS appOpens, 
+               SUM(registeredUsers) AS registeredUsers,
+               SUM(count) AS count
+        FROM (
+            SELECT state, transaction_count, 0 AS appOpens, 0 AS registeredUsers, 0 AS count 
+            FROM agg_trans 
+            WHERE year = %s AND quater = %s
+            UNION ALL
+            SELECT state, 0 AS transaction_count, 0 AS appOpens, 0 AS registeredUsers, count
+            FROM agg_user 
+            WHERE year = %s AND quater = %s
+            UNION ALL
+            SELECT state, 0 AS transaction_count, 0 AS appOpens, 0 AS registeredUsers, count
+            FROM map_trans 
+            WHERE year = %s AND quater = %s
+            UNION ALL
+            SELECT state, 0 AS transaction_count, appOpens, 0 AS registeredUsers, 0 AS count
+            FROM map_user 
+            WHERE year = %s AND quater = %s
+            UNION ALL
+            SELECT state, 0 AS transaction_count, 0 AS appOpens, 0 AS registeredUsers, count
+            FROM top_trans 
+            WHERE year = %s AND quater = %s
+            UNION ALL
+            SELECT state, 0 AS transaction_count, 0 AS appOpens, registeredUsers, 0 AS count
+            FROM top_user 
+            WHERE year = %s AND quater = %s
+        ) AS combined_data
+        GROUP BY state
+    """
+
+    cursor.execute(query, (year, quater, year, quater, year, quater, year, quater, year, quater, year, quater))
+
+    data = cursor.fetchall()
+
+    # Get column names
+    column_names = [desc[0] for desc in cursor.description]
+
+    # Create a DataFrame using the fetched data
+    df = pd.DataFrame(data, columns=column_names)
+
+    # Close the cursor and connection
+    cursor.close()
+    mydb.close()
+
+    # Creating the Streamlit web app
+    st.title(f'Choropleth Map of India for Q{quater}/{year}')
+
+    if not df.empty:
+        # Select which metric to visualize
+        metric = st.selectbox('Select Metric to Visualize', ['transaction_count', 'appOpens', 'registeredUsers', 'count'])
+
+        # Create a choropleth map using Plotly
+        fig = px.choropleth(
+            df,
+            geojson="https://gist.githubusercontent.com/jbrobst/56c13bbbf9d97d187fea01ca62ea5112/raw/e388c4cae20aa53cb5090210a42ebb9b765c0a36/india_states.geojson",
+            featureidkey='properties.ST_NM',  # Ensure this key matches the GeoJSON file
+            locations='state',
+            color=metric,  # Dynamic metric selection
+            color_continuous_scale='Greens',
+            title=f'{metric} by State in Q{quater}/{year}'
+        )
+
+        fig.update_geos(fitbounds="locations", visible=False)
+        st.plotly_chart(fig)  # Display the Plotly chart
+    else:
+        st.error("No data found to display.")
